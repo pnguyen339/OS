@@ -114,7 +114,7 @@ void executeCommand()
 		{		 	
 		 	for(int i = 0; i < len; i++)
 		 	{
-		 		myargs1[i] = (char*) vector_get(execArg, i);
+		 		myargs1[i] = strdup((char*) vector_get(execArg, i));
 		 	}
 			myargs1[len] = NULL;
 		}
@@ -135,7 +135,7 @@ void executeCommand()
 		{
 			for(int i = 0; i < len; i++)
 			{
-				myargs2[i] = (char*) vector_get(execArg, i);
+				myargs2[i] = strdup((char*) vector_get(execArg, i));
 			}
 
 			myargs2[len] = NULL;
@@ -221,7 +221,7 @@ void executeCommand()
 			else 
 			{
 				//Child 2
-				//sleep(1);
+				sleep(1);
 				setpgid(0,pid_ch1); //child2 joins the group whose group id is same as child1's pid
 				close(pipefd[1]); // close the write end
 				dup2(pipefd[0],STDIN_FILENO);
@@ -280,10 +280,10 @@ int main(int argc, char *argv[]) {
 		executeArr  = vector_constructor(0);
 		
 		Vector *input = readCommnand();
-		for(int i = 0; i< vector_len(input); i++)
-		{
-			printf("%s\n",(char*) vector_get(input, i));
-		}
+		// for(int i = 0; i< vector_len(input); i++)
+		// {
+		// 	printf("%s\n",(char*) vector_get(input, i));
+		// }
 		processCommand(input);
 		executeCommand();
 	}
