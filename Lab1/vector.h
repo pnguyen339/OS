@@ -8,6 +8,7 @@ typedef struct vector_str
 	void** data;	
 } Vector;
 
+int vector_len(Vector* this);
 Vector* vector_constructor(int size);
 void vector_realloc(Vector *this,  int size);
 void vector_appendE(Vector *vec,void *data);

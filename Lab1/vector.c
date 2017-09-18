@@ -68,12 +68,29 @@ void vector_appendE(Vector *vec,void *data)
 
 }
 
+int vector_insertE(Vector *vec,void *data, int index)
+{
+	if(index >= vec -> len)
+	{
+		return -1;
+	}
+
+	vec -> data[index] = data;
+	return 0;
+
+}
+
 void* vector_get(Vector* this, int index)
 {
 	if(index < 0 && index >= this -> len)
 		return NULL;
 	else
 		return this -> data[index];
+}
+
+int vector_len(Vector* this)
+{
+	return this -> len;
 }
 
 
