@@ -114,7 +114,7 @@ void executeCommand()
 		{		 	
 		 	for(int i = 0; i < len; i++)
 		 	{
-		 		myargs1[0] = (char*) vector_get(execArg, i);
+		 		myargs1[i] = (char*) vector_get(execArg, i);
 		 	}
 			myargs1[len] = NULL;
 		}
@@ -135,7 +135,7 @@ void executeCommand()
 		{
 			for(int i = 0; i < len; i++)
 			{
-				myargs2[0] = (char*) vector_get(execArg, i);
+				myargs2[i] = (char*) vector_get(execArg, i);
 			}
 
 			myargs2[len] = NULL;
@@ -221,7 +221,7 @@ void executeCommand()
 			else 
 			{
 				//Child 2
-				sleep(1);
+				//sleep(1);
 				setpgid(0,pid_ch1); //child2 joins the group whose group id is same as child1's pid
 				close(pipefd[1]); // close the write end
 				dup2(pipefd[0],STDIN_FILENO);
@@ -242,19 +242,30 @@ void executeCommand()
 	}
 	else
 	{
-		Vector *execArg = (Vector*) vector_get(executeArr, 0);
-		if(execArg != NULL)
-		{
-			
-			int len = vector_len(execArg);
-			char *myargs[len + 1];
-			for(int i = 0; i < len; i++)
-			{
-				myargs[0] = (char*) vector_get(execArg, i);
-			}
-			myargs[len] = NULL;
-			execvp(myargs[0], myargs);
+		int pidch1;
+		pidch1 = fork();
 
+		if(pidch1 > 0) // parent
+		{	
+			sleep(1);
+		}
+
+		else
+		{
+			Vector *execArg = (Vector*) vector_get(executeArr, 0);
+			if(execArg != NULL)
+			{
+				
+				int len = vector_len(execArg);
+				char *myargs[len + 1];
+				for(int i = 0; i < len; i++)
+				{
+					myargs[i] = (char*) vector_get(execArg, i);
+				}
+				myargs[len] = NULL;
+				execvp(myargs[0], myargs);
+
+			}
 		}
 
 	}	
@@ -263,16 +274,19 @@ void executeCommand()
 
 int main(int argc, char *argv[]) {
 	
-	fileDArr = vector_constructor(2);
-	executeArr  = vector_constructor(0);
-	
-	Vector *input = readCommnand();
-	for(int i = 0; i< vector_len(input); i++)
+	while(1)
 	{
-		printf("%s\n",(char*) vector_get(input, i));
+		fileDArr = vector_constructor(2);
+		executeArr  = vector_constructor(0);
+		
+		Vector *input = readCommnand();
+		for(int i = 0; i< vector_len(input); i++)
+		{
+			printf("%s\n",(char*) vector_get(input, i));
+		}
+		processCommand(input);
+		executeCommand();
 	}
-	processCommand(input);
-	executeCommand();
 }
 
 
