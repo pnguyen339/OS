@@ -50,10 +50,11 @@ static void sig_tstp(int signo)
 // }
 
 
-void processCommand (Vector *input)
+int processCommand (Vector *input)
 {
+	int notJobControl = 0;
 	pipeline = 0;
-	Vector* execCommand = vector_constructor(8); 
+	Vector *execCommand = vector_constructor(8); 
 	Vector *fileD = vector_constructor(3);
 	
 	for(int i = 0; i < 3; i ++)
@@ -65,8 +66,28 @@ void processCommand (Vector *input)
 	{
 		char * token = (char*) vector_get(input, i); 
 		
-		if(strcmp(token, ">") == 0) 
+		
+		if(strcmp(token, "jobs") == 0 && notJobControl == 0)
 		{
+			vector_delete(execCommand);
+			vector_delete(fileD);
+			return 1;
+		}
+		else if(strcmp(token, "fg") == 0 && notJobControl == 0)
+		{
+			vector_delete(execCommand);
+			vector_delete(fileD);
+			return 2;
+		}
+		else if(strcmp(token, "bg") == 0 && notJobControl == 0)
+		{
+			vector_delete(execCommand);
+			vector_delete(fileD);
+			return 3;
+		}
+		else if(strcmp(token, ">") == 0) 
+		{
+			notJobControl = 1;
 			token = (char*) vector_get(input, i + 1); 
 			vector_insertE(fileD, token, 1);
 			i++;
@@ -74,6 +95,7 @@ void processCommand (Vector *input)
 		}
 		else if(strcmp(token, "<") == 0)
 		{
+			notJobControl = 1;
 			token = (char*) vector_get(input, i + 1); 
 			vector_insertE(fileD, token, 0);
 			i++;
@@ -81,6 +103,7 @@ void processCommand (Vector *input)
 		}
 		else if(strcmp(token, "2>") == 0)
 		{
+			notJobControl = 1;
 			token = (char*) vector_get(input, i + 1); 
 			vector_insertE(fileD, token, 2);
 			i++;
@@ -88,6 +111,7 @@ void processCommand (Vector *input)
 		}
 		else if(strcmp(token, "|") == 0)
 		{
+			notJobControl = 1;
 			pipeline = 1;
 			vector_appendE(executeArr, execCommand);
 			vector_appendE(fileDArr, fileD);
@@ -101,12 +125,14 @@ void processCommand (Vector *input)
 		}
 		else
 		{
+			notJobControl = 1;
 			vector_appendE(execCommand, token);
 		}
 	}
 
 	vector_appendE(executeArr, execCommand);
 	vector_appendE(fileDArr, fileD);
+	return 0;
 }
 
 void executeCommand() 
@@ -272,6 +298,14 @@ void executeCommand()
 					fprintf(stderr, "%s: command not found\n", myargs2[0]);
 				}
 
+				if(fpSTDOUT != NULL)
+				{
+					fclose(fpSTDOUT);
+				}
+				if(fpSTDERR != NULL)
+				{
+					fclose(fpSTDERR);
+				}
 			}
 		}
 	  	else 
@@ -313,6 +347,15 @@ void executeCommand()
 			if(execvp(myargs1[0], myargs1) == -1)
 			{
 				fprintf(stderr, "%s: command not found\n", myargs1[0]);
+			}
+
+			if(fpSTDIN != NULL)
+			{
+				fclose(fpSTDIN);
+			}
+			if(fpSTDERR != NULL)
+			{
+				fclose(fpSTDERR);
 			}
 
 		}
@@ -435,7 +478,18 @@ void executeCommand()
 					fprintf(stderr, "%s: command not found\n", myargs[0]);
 				}
 			}
-
+			if(fpSTDOUT != NULL)
+			{
+				fclose(fpSTDOUT);
+			}
+			if(fpSTDERR != NULL)
+			{
+				fclose(fpSTDERR);
+			}
+			if(fpSTDIN != NULL)
+			{
+				fclose(fpSTDIN);
+			}
 			vector_delete(execArg);
 		}
 
@@ -471,11 +525,26 @@ int main(int argc, char *argv[]) {
 		fileDArr = vector_constructor(2);
 		executeArr  = vector_constructor(0);
 		setbuf(stdin, NULL);
-		processCommand(command);
-		executeCommand();
-		vector_delete(command);
-		vector_delete(fileDArr);
-		vector_delete(executeArr);
+		int  typeOfJob = processCommand(command);
+		if(typeOfJob == 1)
+		{
+
+		}
+		else if(typeOfJob == 2)
+		{
+
+		}
+		else if(typeOfJob == 3)
+		{
+
+		}
+		else
+		{
+			executeCommand();
+			vector_delete(command);
+			vector_delete(fileDArr);
+			vector_delete(executeArr);
+		}
 		setbuf(stdin, NULL);
 		printf("# ");
 	}
