@@ -93,5 +93,11 @@ int vector_len(Vector* this)
 	return this -> len;
 }
 
+void vector_delete(Vector* this)
+{
+    free(this->data);   //free the array
+    free(this);          //free the pointer
+}
+
 
 
