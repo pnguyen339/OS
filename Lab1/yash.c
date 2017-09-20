@@ -10,17 +10,49 @@ Vector *fileDArr;
 Vector *executeArr;
 int pipeline;
 
+int totalCom = 0;
+Vector *pidJobs;
+int pidNum[100];
+int finished[100];
+int current;
+char *current_command;
+int bgPogress;
+
+
 int status, pid_ch1, pid_ch2, pid;
 int pipefd[2];
 
 static void sig_int(int signo) 
 {
   kill(-pid_ch1,SIGINT);
+  int i;
+	for(i = 0; i < totalCom; i++)
+	{
+		if(pid_ch1 == pidNum[i])
+		{
+			finished[i] = 1;
+			break;
+		}
+	}
 }
 static void sig_tstp(int signo)
 {
-  kill(-pid_ch1,SIGTSTP);
+  	printf("shit");
+  	kill(-pid_ch1,SIGTSTP);
+	int i;
+	for(i = 0; i < totalCom; i++)
+	{
+		if(pid_ch1 == pidNum[i])
+		{
+			finished[i] = 2;
+			break;
+		}
+	}
+	signal(SIGTTOU, SIG_IGN);
+	tcsetpgrp(0, pid_ch1);
+	
 }
+
 
 
 // Vector* readCommnand() {
@@ -54,6 +86,7 @@ int processCommand (Vector *input)
 {
 	int notJobControl = 0;
 	pipeline = 0;
+	bgPogress = 0;
 	Vector *execCommand = vector_constructor(8); 
 	Vector *fileD = vector_constructor(3);
 	
@@ -123,6 +156,10 @@ int processCommand (Vector *input)
 			
 			}
 		}
+		else if(strcmp(token, "&") == 0)
+		{
+			bgPogress = 1;
+		}
 		else
 		{
 			notJobControl = 1;
@@ -137,11 +174,13 @@ int processCommand (Vector *input)
 
 void executeCommand() 
 {
+	
 	if (signal(SIGINT, sig_int) == SIG_ERR)
 		printf("signal(SIGINT) error");
 		      	
-	if (signal(SIGTSTP, sig_tstp) == SIG_ERR)
-		printf("signal(SIGTSTP) error");
+	
+	
+
 	if(pipeline == 1)
 	{   
 		Vector *execArg = (Vector*) vector_get(executeArr, 0);
@@ -199,6 +238,7 @@ void executeCommand()
 	  	}
 
 	  	pid_ch1 = fork();
+	  	pidNum[totalCom-1] = pid_ch1;
 	 	if (pid_ch1 > 0)
 	 	{
 	    	//printf("Child1 pid = %d\n",pid_ch1);
@@ -214,6 +254,8 @@ void executeCommand()
 		   //    	if (signal(SIGTSTP, sig_tstp) == SIG_ERR)
 					// printf("signal(SIGTSTP) error");
 		      	
+		      	if (signal(SIGTSTP, sig_tstp) == SIG_ERR)
+					printf("signal(SIGTSTP) error");
 		      	close(pipefd[0]); //close the pipe in the parent
 		      	close(pipefd[1]);
 		      	int count = 0;
@@ -237,15 +279,28 @@ void executeCommand()
 					{
 					  //printf("child %d exited, status=%d\n", pid, WEXITSTATUS(status));
 					  count++;
+					  int i;
+						for(i = 0; i < totalCom; i++)
+						{
+							if(pid_ch1 == pidNum[i])
+							{
+								finished[i] = 1;
+								break;
+							}
+						}
 					} 
 					else if (WIFSIGNALED(status)) 
 					{
 					  //printf("child %d killed by signal %d\n", pid, WTERMSIG(status));
 					  count++;
 					} 
-					// else if (WIFSTOPPED(status)) 
-					// {
-					// 	//printf("%d stopped by signal %d\n", pid,WSTOPSIG(status));
+					else if(bgPogress == 1)
+					{
+						break;
+					}
+					else if (WIFSTOPPED(status)) 
+					{
+						printf("%d stopped by signal %d\n", pid,WSTOPSIG(status));
 					// 	//printf("Sending CONT to %d\n", pid);
 					// 	sleep(4); //sleep for 4 seconds before sending CONT
 					// 	kill(pid,SIGCONT);
@@ -253,7 +308,7 @@ void executeCommand()
 					// else if (WIFCONTINUED(status)) 
 					// {
 					// 	printf("Continuing %d\n",pid);
-					// }
+				    }
 			    }
 		      	return;
 	    	}
@@ -297,6 +352,14 @@ void executeCommand()
 				{
 					fprintf(stderr, "%s: command not found\n", myargs2[0]);
 				}
+				else
+				{
+					vector_appendE(pidJobs, current_command);
+					finished[totalCom] = 0;
+					current = totalCom;
+					totalCom++;
+				}	
+
 
 				if(fpSTDOUT != NULL)
 				{
@@ -348,7 +411,13 @@ void executeCommand()
 			{
 				fprintf(stderr, "%s: command not found\n", myargs1[0]);
 			}
-
+			else
+			{
+				vector_appendE(pidJobs, current_command);
+				finished[totalCom] = 0;
+				current = totalCom;
+				totalCom++;
+			}	
 			if(fpSTDIN != NULL)
 			{
 				fclose(fpSTDIN);
@@ -363,10 +432,11 @@ void executeCommand()
 	else
 	{
 		pid_ch1 = fork();
-
+		pidNum[totalCom -1] = pid_ch1;
 		if(pid_ch1 > 0) // parent
 		{	
-
+			if (signal(SIGTSTP, sig_tstp) == SIG_ERR)
+				printf("signal(SIGTSTP) error");	
 			int count = 0;
 	      	while (count < 1) 
 	      	{
@@ -387,6 +457,15 @@ void executeCommand()
 				if (WIFEXITED(status)) 
 				{
 				  //printf("child %d exited, status=%d\n", pid, WEXITSTATUS(status));
+					int i;
+					for(i = 0; i < totalCom; i++)
+					{
+						if(pid_ch1 == pidNum[i])
+						{
+							finished[i] = 1;
+							break;
+						}
+					}
 				  count++;
 				} 
 				else if (WIFSIGNALED(status)) 
@@ -394,13 +473,19 @@ void executeCommand()
 				  //printf("child %d killed by signal %d\n", pid, WTERMSIG(status));
 				  count++;
 				} 
-				// else if (WIFSTOPPED(status)) 
-				// {
-				// 	//printf("%d stopped by signal %d\n", pid,WSTOPSIG(status));
+				else if(bgPogress == 1)
+				{
+					current = totalCom-1;
+
+					break;
+				}
+				else if (WIFSTOPPED(status)) 
+				{
+					//printf("%d stopped by signal %d\n", pid,WSTOPSIG(status));
 				// 	//printf("Sending CONT to %d\n", pid);
 				// 	sleep(4); //sleep for 4 seconds before sending CONT
 				// 	kill(pid,SIGCONT);
-				// }
+				}
 				// else if (WIFCONTINUED(status)) 
 				// {
 				// 	//printf("Continuing %d\n",pid);
@@ -497,13 +582,32 @@ void executeCommand()
 }
 
 
+void checkChild()
+{
+	pid = waitpid(-1, &status, WUNTRACED | WNOHANG);
+	if(pid != 0)
+	{
+		int i;
+		for(i = 0; i < totalCom; i++)
+		{
+			if(pid == pidNum[i])
+			{
+				finished[i] = 1;
+				break;
+			}
+		}
+	}
+}
+
 int main(int argc, char *argv[]) {
 	
+	pidJobs = vector_constructor(100);
 	char input[2000];
 	printf("# ");
 	
 	while(fgets(input, 2000, stdin) != NULL) 
 	{
+		current_command = strdup(input);
 		Vector* command = vector_constructor(8);
 
 		char *no_newline = strtok(input, "\n");
@@ -525,18 +629,93 @@ int main(int argc, char *argv[]) {
 		fileDArr = vector_constructor(2);
 		executeArr  = vector_constructor(0);
 		setbuf(stdin, NULL);
-		int  typeOfJob = processCommand(command);
+		checkChild();
+		int typeOfJob = processCommand(command);
 		if(typeOfJob == 1)
 		{
+			for(int i =0; i < vector_len(pidJobs); i++) 
+			{
+				char* strpt = (char*)vector_get(pidJobs,i);
+				if( strpt != NULL)
+				{
+					char* status;
+					char* currentStat;
+					if(finished[i] == 1)
+						status = strdup("Done");
+					else if(finished[i] == 2)
+						status = strdup("Stopped");
+					else
+						status = strdup("Running");
 
+					if(current == i)
+					{
+						currentStat = strdup("+");
+					}
+					else
+						currentStat = strdup("-");
+					printf("[%d]%s  %s                 %s\n", i+1,currentStat,status, strpt);
+
+					free(strpt);
+					free(status);
+					free(currentStat);
+				} 
+
+			}
 		}
 		else if(typeOfJob == 2)
 		{
+			char *pidArgs = (char*) vector_get(command, 1);
+			if(pidArgs == NULL)
+			{
+				if(finished[pidNum[current]] != 1)
+				{
+					kill(pidNum[current], SIGCONT);
+				}
+				else
+					fprintf(stderr, "fg: %s : no such job", "current");
+			}
+			else
+			{
+				char *num =  strdup(pidArgs+1);
+				int i = atoi (num);
+				
+				if(finished[pidNum[i]] != 1)
+				{
+					kill(pidNum[i], SIGCONT);
+				}
+				else
+					fprintf(stderr, "fg: %%%d : no such job", i);
+				free(num);
+				free(pidArgs);
 
+			}
 		}
 		else if(typeOfJob == 3)
 		{
-
+			char *pidArgs = (char*) vector_get(command, 1);
+			if(pidArgs == NULL)
+			{
+				if(finished[pidNum[current]] != 1)
+				{
+					kill(pidNum[current], SIGCONT);
+				}
+				else
+					fprintf(stderr, "bg: %s : no such job", "current");
+			}
+			else
+			{
+				char *num =  strdup(pidArgs+1);
+				int i = atoi (num);
+				
+				if(finished[pidNum[i]] != 1)
+				{
+					kill(pidNum[i], SIGCONT);
+				}
+				else
+					fprintf(stderr, "bg: %%%d : no such job", i);
+				free(num);
+				free(pidArgs);
+			}
 		}
 		else
 		{
